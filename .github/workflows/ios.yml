@@ -1,0 +1,45 @@
+name: iOS
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [ios-app/**, version.json, .github/workflows/ios.yml]
+permissions:
+  contents: write
+jobs:
+  ipa:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Установить XcodeGen
+        run: brew install xcodegen
+      - name: Собрать проект
+        working-directory: ios-app
+        run: |
+          export APP_VERSION=$(jq -r .version ../version.json)
+          export APP_BUILD=$(( $(date +%s) / 60 ))
+          xcodegen generate
+      - name: Собрать приложение без подписи
+        working-directory: ios-app
+        run: |
+          xcodebuild -project Echo.xcodeproj -scheme Echo -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+      - name: Упаковать IPA
+        working-directory: ios-app
+        run: |
+          V=$(jq -r .version ../version.json)
+          rm -rf Payload && mkdir Payload
+          cp -R build/Build/Products/Release-iphoneos/Echo.app Payload/
+          zip -qry "Echo-$V.ipa" Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Echo-ipa
+          path: ios-app/*.ipa
+      - name: Положить в релиз
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          V=$(jq -r .version version.json)
+          gh release view "v$V" >/dev/null 2>&1 || gh release create "v$V" --title "ЭХО $V" --notes "ЭХО $V"
+          gh release upload "v$V" "ios-app/Echo-$V.ipa" --clobber
