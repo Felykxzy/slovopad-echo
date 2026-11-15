@@ -17,3 +17,6 @@
 
 ## Файл для iPhone
 Файл `Echo-….ipa` появляется на странице [релизов](https://github.com/Felykxzy/slovopad-echo/releases/latest) после сборки. Ставится через Sideloadly так же, как игра. Инструкция: `ios-app/README.md` (в игре она тоже есть).
+
+
+не скачивать
