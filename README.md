@@ -1,2 +1,3 @@
 # slovopad-echo
-echo- is a messanger
+echo- is a messanger from slovopad
+
