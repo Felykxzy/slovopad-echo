@@ -87,6 +87,11 @@ nav button.on{color:var(--tx);background:linear-gradient(135deg,rgba(94,242,255,
 .composer input{flex:1;padding:13px 16px;border-radius:22px;border:1px solid var(--line);background:var(--card);outline:none}
 .composer button{flex:none;width:48px;height:48px;border-radius:50%;border:0;cursor:pointer;background:linear-gradient(135deg,var(--ac),var(--pk));display:grid;place-items:center}
 .composer button svg{width:20px;height:20px;stroke:#07061a;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.qrbox{margin-top:14px;display:flex;flex-direction:column;align-items:center;gap:8px;padding:18px;border-radius:var(--r);background:var(--card);border:1px solid var(--line)}
+.qrbox canvas{width:240px;height:240px;max-width:100%;border-radius:16px;background:#fff;padding:10px;box-sizing:content-box}
+.qrbox .qrh{margin:0 0 4px;color:var(--mut);font-size:13px;text-align:center;line-height:1.45}
+.qrc{font-size:20px;font-weight:800;letter-spacing:.2em}
+.qrbox .btn{width:100%}
 .toast{position:fixed;left:50%;bottom:calc(var(--sab) + 96px);transform:translateX(-50%) translateY(20px);opacity:0;background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:14px;font-size:14px;transition:.25s;pointer-events:none;z-index:60;max-width:90vw}
 .toast.on{opacity:1;transform:translateX(-50%)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -112,6 +117,16 @@ nav button.on{color:var(--tx);background:linear-gradient(135deg,rgba(94,242,255,
       <input class="in" id="pass" type="password" placeholder="Пароль (от 8 символов)" autocomplete="current-password">
       <button class="btn" id="go" type="button">ВОЙТИ</button>
       <div class="hint" id="authHint"></div>
+      <button class="btn ghost" id="qrOpen" type="button">📷 ВОЙТИ ПО QR ИЗ ИГРЫ</button>
+      <div id="qrBox" class="qrbox hid">
+        <p class="qrh">Открой игру на телефоне, где ты уже вошёл: Профиль → Slovopad ID → «Сканировать QR». Или наведи камеру телефона на код.</p>
+        <canvas id="qrCv" width="240" height="240"></canvas>
+        <div class="qrc" id="qrCode"></div>
+        <div class="hint" id="qrPin"></div>
+        <div class="hint" id="qrHint"></div>
+        <button class="btn ghost hid" id="qrNew" type="button">НОВЫЙ КОД</button>
+        <button class="btn ghost" id="qrCancel" type="button" style="margin-top:8px">ОТМЕНА</button>
+      </div>
     </div>
   </main>
 
@@ -142,6 +157,7 @@ nav button.on{color:var(--tx);background:linear-gradient(135deg,rgba(94,242,255,
 
 <div class="toast" id="toast"></div>
 
+<script src="qr.js"></script>
 <script>
 (() => {
   "use strict";
@@ -203,6 +219,47 @@ nav button.on{color:var(--tx);background:linear-gradient(135deg,rgba(94,242,255,
     closeChat(); stopPoll(); $("home").classList.add("hid"); $("authWrap").classList.remove("hid");
     if (!silent) toast("Ты вышел из аккаунта");
   }
+
+  /* ---------- вход по QR из игры ---------- */
+  let qr = null, qrTimer = 0;
+  function qrStop() {
+    clearInterval(qrTimer); qrTimer = 0; qr = null;
+    $("qrBox").classList.add("hid"); $("qrOpen").classList.remove("hid");
+  }
+  async function qrStart() {
+    qrStop();
+    $("qrBox").classList.remove("hid"); $("qrOpen").classList.add("hid"); $("qrNew").classList.add("hid");
+    $("qrPin").textContent = ""; $("qrCode").textContent = ""; $("qrHint").classList.remove("bad"); $("qrHint").textContent = "Создаю код…";
+    let d;
+    try { d = await api("/api/qr/new", {}) } catch (e) { qrStop(); $("authHint").textContent = e.message; $("authHint").classList.add("bad"); return }
+    const s = qr = { code: d.code, secret: d.secret, end: Date.now() + d.expiresIn * 1000 };
+    try { SlovopadQR.draw($("qrCv"), GAME + "?qr=" + d.code, 240) } catch (e) { qrStop(); $("authHint").textContent = "Не удалось нарисовать код."; return }
+    $("qrCode").textContent = d.code.slice(0, 4) + "-" + d.code.slice(4);
+    $("qrPin").textContent = "Число для телефона: " + d.pin;
+    $("qrHint").textContent = "Жду подтверждения из игры…"; $("qrBox").scrollIntoView({ behavior: "smooth", block: "center" });
+    qrTimer = setInterval(async () => {
+      if (qr !== s) return;
+      if (Date.now() >= s.end) {
+        clearInterval(qrTimer); qr = null;
+        $("qrHint").textContent = "Код устарел. Создай новый."; $("qrHint").classList.add("bad"); $("qrNew").classList.remove("hid"); return;
+      }
+      const left = Math.max(0, Math.ceil((s.end - Date.now()) / 1000));
+      $("qrHint").textContent = "Жду подтверждения из игры… Действует ещё " + Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0");
+      let r; try { r = await api("/api/qr/poll", { code: s.code, secret: s.secret }) } catch (e) { return }
+      if (qr !== s) return;
+      if (r.status === "ok") {
+        clearInterval(qrTimer); qr = null;
+        token = r.token; localStorage.setItem(TOKEN, token);
+        me = r; $("qrBox").classList.add("hid"); $("authWrap").classList.add("hid"); $("home").classList.remove("hid"); render(); toast("Вход выполнен");
+      } else if (r.status === "expired") {
+        clearInterval(qrTimer); qr = null;
+        $("qrHint").textContent = "Код устарел. Создай новый."; $("qrHint").classList.add("bad"); $("qrNew").classList.remove("hid");
+      }
+    }, 2000);
+  }
+  $("qrOpen").onclick = qrStart;
+  $("qrNew").onclick = qrStart;
+  $("qrCancel").onclick = qrStop;
 
   /* ---------- главная ---------- */
   document.querySelectorAll("nav button").forEach(b => b.onclick = () => { tab = b.dataset.tab; document.querySelectorAll("nav button").forEach(x => x.classList.toggle("on", x === b)); render() });
