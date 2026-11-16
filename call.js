@@ -1,0 +1,293 @@
+/* ЭХО — звонки: голос, видео, показ экрана (до 4 человек). Звук и видео идут напрямую (WebRTC),
+   сервер только знакомит участников (/api/echo/call/*). Нужен: EchoCall.init({api}) из index.html. */
+(function () {
+  "use strict";
+  const g = id => document.getElementById(id);
+  const I = {
+    mic: '<path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
+    micoff: '<path d="M4 4l16 16"/><path d="M9 9v3a3 3 0 0 0 5 2M15 10V6a3 3 0 0 0-6-1"/><path d="M5 11a7 7 0 0 0 11 5.5M12 18v3"/>',
+    cam: '<rect x="3" y="6" width="13" height="12" rx="3"/><path d="M16 10l5-3v10l-5-3"/>',
+    camoff: '<path d="M4 4l16 16"/><path d="M16 10l5-3v10l-3-1.8M13 6H6a3 3 0 0 0-3 3v6a3 3 0 0 0 1 2.2"/>',
+    screen: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+    swap: '<path d="M7 7h11l-3-3M17 17H6l3 3"/>',
+    flip: '<path d="M4 12a8 8 0 0 1 14-5l2 2M20 12a8 8 0 0 1-14 5l-2-2"/><path d="M20 4v5h-5M4 20v-5h5"/>',
+    end: '<path d="M3 14c5-4 13-4 18 0l-2 3-4-1.5V13c-2-.7-4-.7-6 0v2.5L5 17z"/>',
+    back: '<path d="M15 18l-6-6 6-6"/>',
+    phone: '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A15 15 0 0 1 3 6a2 2 0 0 1 2-2z"/>'
+  };
+  const svg = (n, s) => '<svg viewBox="0 0 24 24" width="' + (s || 26) + '" height="' + (s || 26) + '" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + I[n] + '</svg>';
+  function h(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e }
+  let api = null;
+  const post = (p, b) => api(p, b || {});
+  const C = { active: false, room: "", roomName: "", me: "", myJ: 0, ice: [], peers: {}, early: {}, mic: null, cam: null, micOn: true, camOn: false, facing: "user", after: 0, timer: 0, hb: 0, busy: false, fail: 0, tile: null, turn: false, scr: false };
+
+  /* ---------- звуки (синтез) ---------- */
+  let AC = null;
+  function actx() { try { AC = AC || new (window.AudioContext || window.webkitAudioContext)(); if (AC.state === "suspended") AC.resume(); return AC } catch (e) { return null } }
+  function tone(f, at, dur, type, vol, f2) {
+    const a = actx(); if (!a) return; const o = a.createOscillator(), gn = a.createGain(), t = a.currentTime + at;
+    o.type = type || "sine"; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+    gn.gain.setValueAtTime(0.0001, t); gn.gain.exponentialRampToValueAtTime(vol || 0.12, t + 0.015); gn.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(gn); gn.connect(a.destination); o.start(t); o.stop(t + dur + 0.03);
+  }
+  function sfx(k) {
+    switch (k) {
+      case "me-join": tone(659, 0, .16, "sine", .12); tone(880, .11, .16, "sine", .12); tone(1175, .22, .3, "sine", .1); break;
+      case "me-leave": tone(880, 0, .16, "sine", .1); tone(659, .11, .16, "sine", .1); tone(440, .22, .3, "sine", .09); break;
+      case "join": tone(659, 0, .13, "triangle", .1); tone(880, .1, .2, "triangle", .1); break;
+      case "leave": tone(880, 0, .13, "triangle", .09); tone(659, .1, .2, "triangle", .09); break;
+      case "mute": tone(420, 0, .12, "sine", .13, 210); break;
+      case "unmute": tone(520, 0, .1, "sine", .12, 880); break;
+      case "cam": tone(700, 0, .05, "square", .04); tone(940, .06, .05, "square", .04); break;
+      case "ring": [0, .5, 1.3, 1.8].forEach((d, i) => tone(i % 2 ? 659 : 784, d, .32, "sine", .13)); break;
+    }
+  }
+
+  /* ---------- экран звонка ---------- */
+  function build() {
+    if (g("call")) return;
+    const o = h("section"); o.id = "call"; o.setAttribute("aria-label", "Звонок");
+    o.innerHTML = '<div class="clh"><button class="ibtn" id="clBk" type="button" aria-label="Свернуть">' + svg("back", 22) + '</button><div class="clt"><b id="clT"></b><small><span id="clS"></span><i id="clTm">0:00</i></small></div></div>' +
+      '<div class="cgrid" id="clG"></div><div class="chint" id="clSt"></div>' +
+      '<div class="cbar glass">' +
+      cb("clMic", "mic", "Микрофон") + cb("clCam", "cam", "Камера") + cb("clScr", "screen", "Экран", "clScw") + cb("clCs", "swap", "Камеры", "clCsw") + cb("clFl", "flip", "Поворот", "clFlw") + cb("clEnd", "end", "Выйти", "", " end") + '</div><div class="clcm" id="clCm" hidden></div>';
+    document.body.appendChild(o);
+    g("clBk").onclick = minimize; g("clMic").onclick = toggleMic; g("clCam").onclick = toggleCam; g("clFl").onclick = flip; g("clScr").onclick = toggleScr; g("clEnd").onclick = () => leave(true);
+    g("clScw").hidden = !(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia); g("clCsw").hidden = true; g("clFlw").hidden = true;
+    g("clCs").onclick = e => { e.stopPropagation(); const m = g("clCm"); if (m.hidden) camMenu(); else m.hidden = true };
+    o.addEventListener("click", e => { const m = g("clCm"); if (!m.hidden && !m.contains(e.target)) m.hidden = true });
+    document.addEventListener("visibilitychange", () => { if (document.hidden) C.hid = Date.now() });
+    try { navigator.mediaDevices.addEventListener("devicechange", () => { camList().then(camUi) }) } catch (e) { }
+  }
+  function cb(id, ic, label, wid, extra) { return '<div class="cbw"' + (wid ? ' id="' + wid + '"' : '') + '><button class="cb' + (extra || "") + '" id="' + id + '" type="button">' + svg(ic) + '</button><span>' + label + '</span></div>' }
+  const setIc = (id, ic) => { const b = g(id); if (b) b.innerHTML = svg(ic) };
+  const coarse = () => { try { return matchMedia("(pointer:coarse)").matches } catch (e) { return false } };
+  async function camList() { try { const d = await navigator.mediaDevices.enumerateDevices(); C.cams = d.filter(x => x.kind === "videoinput" && x.deviceId) } catch (e) { C.cams = [] } return C.cams }
+  function camUi() {
+    const w = g("clCsw"); if (!w) return;
+    const many = !!(C.cams && C.cams.length > 1 && C.camOn && !C.scr && !coarse());
+    w.hidden = !many; if (many) g("clFlw").hidden = true; if (!many && g("clCm")) g("clCm").hidden = true;
+  }
+  async function camMenu() {
+    const m = g("clCm"), list = await camList(); m.textContent = "";
+    list.forEach((d, i) => {
+      const b = h("button", "clci" + ((C.cam && C.cam.getSettings && C.cam.getSettings().deviceId === d.deviceId) ? " on" : "")); b.type = "button";
+      b.textContent = d.label || ("Камера " + (i + 1)); b.onclick = async () => { m.hidden = true; await camPick(d.deviceId) }; m.appendChild(b);
+    });
+    m.hidden = false;
+  }
+  async function camPick(id) {
+    if (!C.camOn || C.scr) return;
+    const old = C.devId; C.devId = id; try { localStorage.setItem("callCamId", id) } catch (e) { }
+    try { if (C.cam) { C.cam.stop(); C.cam = null } await camStart(); paintSelf() }
+    catch (e) { C.devId = old; try { await camStart() } catch (x) { C.camOn = false; paintSelf(); sendAll(); hint("Эта камера не включилась.", true) } }
+  }
+  const sendAll = () => Object.values(C.peers).forEach(sendState);
+  const hint = (msg, bad) => { const e = g("clSt"); if (e) { e.textContent = msg || ""; e.classList.toggle("bad", !!bad) } };
+  const hue = n => { let x = 0; for (const c of String(n)) x = (x * 31 + c.charCodeAt(0)) % 360; return x };
+  function makeTile(name, self) {
+    const t = h("div", "ctile" + (self ? " self" : "")), v = h("video"); v.autoplay = true; v.playsInline = true; v.setAttribute("playsinline", ""); if (self) v.muted = true;
+    const av = h("div", "cav"), c = h("i", "", (name || "?").slice(0, 1).toUpperCase()); c.style.background = "linear-gradient(135deg,hsl(" + hue(name) + " 85% 62%),hsl(" + ((hue(name) + 50) % 360) + " 80% 48%))"; av.appendChild(c);
+    const nm = h("div", "cnm", self ? name + " · ты" : name), st = h("div", "cst");
+    t.appendChild(v); t.appendChild(av); t.appendChild(nm); t.appendChild(st); t._v = v; t._st = st; t.classList.add("nocam");
+    return t;
+  }
+  function layout() {
+    const G = g("clG"); if (!G) return; G.dataset.n = String(G.querySelectorAll(".ctile").length);
+    const names = Object.keys(C.peers);
+    g("clT").textContent = C.roomName; g("clS").textContent = (names.length + 1) + " в звонке · ";
+    G.classList.toggle("alone", names.length === 0);
+    let w = G.querySelector(".cwait"); if (!names.length && !w) { w = h("div", "cwait"); w.appendChild(h("i", "")); w.appendChild(h("span", "", "Ждём друзей…")); G.appendChild(w) } else if (names.length && w) w.remove();
+  }
+  function paintTile(P) {
+    const t = P.tile; if (!t) return; t.classList.toggle("nocam", !P.cam); t.classList.toggle("scr", !!(P.cam && P.scr));
+    t._st.innerHTML = P.mic === false ? svg("micoff", 16) : "";
+  }
+  function paintSelf() {
+    if (!C.tile) return; C.tile.classList.toggle("nocam", !C.camOn); C.tile.classList.toggle("flip", C.facing === "user" && !C.scr); C.tile.classList.toggle("scr", !!C.scr);
+    g("clScr").classList.toggle("on", !!C.scr); C.tile._st.innerHTML = C.micOn ? "" : svg("micoff", 16);
+    g("clMic").classList.toggle("off", !C.micOn); setIc("clMic", C.micOn ? "mic" : "micoff"); setIc("clCam", C.camOn ? "cam" : "camoff");
+    g("clCam").classList.toggle("on", C.camOn); g("clFlw").hidden = !C.camOn || !!C.scr || !coarse(); camUi();
+  }
+  function watch(tile, stream) {
+    const a = actx(); if (!a || !stream || !stream.getAudioTracks().length) return;
+    try { const src = a.createMediaStreamSource(new MediaStream([stream.getAudioTracks()[0]])), an = a.createAnalyser(); an.fftSize = 512; src.connect(an); tile._an = an; tile._buf = new Uint8Array(an.fftSize); tile._src = src } catch (e) { }
+  }
+  function speakLoop() {
+    if (!C.active) return; const G = g("clG");
+    if (G) Array.from(G.children).forEach(t => {
+      if (!t._an) return; t._an.getByteTimeDomainData(t._buf); let m = 0; for (let k = 0; k < t._buf.length; k++) m = Math.max(m, Math.abs(t._buf[k] - 128));
+      t.classList.toggle("speak", m > 14 && !(t.classList.contains("self") && !C.micOn));
+    });
+    C.sp = setTimeout(speakLoop, 110);
+  }
+  function timerLoop() { const e = g("clTm"); if (!e || !C.active) return; const s = Math.floor((Date.now() - C.t0) / 1000); e.textContent = Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0") }
+
+  /* ---------- сигналы WebRTC ---------- */
+  const sig = (to, data) => post("/api/echo/call/sig", { room: C.room, to, data: JSON.stringify(data) }).catch(() => { });
+  function queueCand(P, c) { P.cq = P.cq || []; P.cq.push(c); if (P.ct) return; P.ct = setTimeout(() => { P.ct = 0; const cs = P.cq.splice(0); if (cs.length) sig(P.name, { cs }) }, 250) }
+  function attachLocal(P) {
+    P.pc.getTransceivers().forEach(tr => {
+      const kind = tr.receiver && tr.receiver.track ? tr.receiver.track.kind : "";
+      const track = kind === "audio" ? C.mic : kind === "video" ? C.cam : null;
+      try { tr.direction = "sendrecv"; tr.sender.replaceTrack(track || null); if (kind === "video") tune(tr.sender) } catch (e) { }
+    });
+  }
+  function tune(sender) {
+    try {
+      const n = Math.max(1, Object.keys(C.peers).length), p = sender.getParameters(); p.encodings = p.encodings && p.encodings.length ? p.encodings : [{}];
+      p.encodings[0].maxBitrate = n <= 1 ? 2500000 : n === 2 ? 1800000 : 1200000; p.encodings[0].maxFramerate = C.scr ? 30 : 60; p.degradationPreference = C.scr ? "maintain-resolution" : "maintain-framerate";
+      sender.setParameters(p).catch(() => { });
+    } catch (e) { }
+  }
+  function sendState(P) { try { if (P.dc && P.dc.readyState === "open") P.dc.send(JSON.stringify({ cam: C.camOn, mic: C.micOn, scr: !!C.scr })) } catch (e) { } }
+  function wireDc(P, dc) { P.dc = dc; dc.onopen = () => sendState(P); dc.onmessage = e => { try { const d = JSON.parse(e.data); P.cam = !!d.cam; P.mic = d.mic !== false; P.scr = !!d.scr; paintTile(P) } catch (x) { } } }
+  function ensurePeer(name) {
+    if (C.peers[name]) return C.peers[name];
+    const pc = new RTCPeerConnection({ iceServers: C.ice }), P = { name, pc, pend: [], stream: new MediaStream(), cam: false, mic: true, tile: makeTile(name, false), dc: null, made: Date.now() };
+    C.peers[name] = P; P.tile._v.srcObject = P.stream; g("clG").appendChild(P.tile); layout();
+    pc.onicecandidate = e => { if (e.candidate) queueCand(P, e.candidate.toJSON ? e.candidate.toJSON() : e.candidate) };
+    pc.ontrack = e => {
+      if (!P.stream.getTracks().includes(e.track)) P.stream.addTrack(e.track);
+      if (e.track.kind === "audio" && !P.tile._an) watch(P.tile, P.stream);
+      if (e.track.kind === "video") { e.track.onunmute = () => { P.cam = true; paintTile(P) }; e.track.onmute = () => { P.cam = false; paintTile(P) } }
+      try { P.tile._v.play().catch(() => { }) } catch (x) { }
+    };
+    pc.ondatachannel = e => wireDc(P, e.channel);
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === "connected") { P.tile.classList.remove("wait"); hint(""); sendState(P); if (!P.heard) { P.heard = true; sfx("join") } }
+      else if (pc.connectionState === "connecting" || pc.connectionState === "new") P.tile.classList.add("wait");
+      else if (pc.connectionState === "failed") { hint("Связь с " + name + " оборвалась, пробую снова…", true); closePeer(name) }
+    };
+    return P;
+  }
+  function closePeer(name) {
+    const P = C.peers[name]; if (!P) return; delete C.peers[name]; if (P.heard && C.active) sfx("leave");
+    try { clearTimeout(P.ct); P.pc.close() } catch (e) { }
+    if (P.tile && P.tile.parentNode) P.tile.parentNode.removeChild(P.tile); layout();
+  }
+  async function callOut(name) {
+    const P = ensurePeer(name);
+    try {
+      wireDc(P, P.pc.createDataChannel("st"));
+      P.pc.addTransceiver("audio", { direction: "sendrecv" }); P.pc.addTransceiver("video", { direction: "sendrecv" }); attachLocal(P);
+      const off = await P.pc.createOffer(); await P.pc.setLocalDescription(off);
+      sig(name, { t: "offer", sdp: P.pc.localDescription.sdp });
+    } catch (e) { closePeer(name) }
+  }
+  async function flushCands(P) { const q = P.pend.splice(0); for (const c of q) { try { await P.pc.addIceCandidate(c) } catch (e) { } } }
+  async function onSig(s) {
+    let d; try { d = JSON.parse(s.data) } catch (e) { return }
+    const from = s.from;
+    if (d.t === "offer") {
+      closePeer(from); const P = ensurePeer(from);
+      try {
+        await P.pc.setRemoteDescription({ type: "offer", sdp: d.sdp }); attachLocal(P);
+        const ans = await P.pc.createAnswer(); await P.pc.setLocalDescription(ans);
+        sig(from, { t: "answer", sdp: P.pc.localDescription.sdp });
+        (C.early[from] || []).forEach(c => P.pend.push(c)); delete C.early[from]; await flushCands(P);
+      } catch (e) { closePeer(from) }
+    } else if (d.t === "answer") {
+      const P = C.peers[from];
+      if (P && P.pc.signalingState === "have-local-offer") { try { await P.pc.setRemoteDescription({ type: "answer", sdp: d.sdp }); await flushCands(P) } catch (e) { } }
+    } else if (d.cs) {
+      const P = C.peers[from];
+      if (P && P.pc.remoteDescription) d.cs.forEach(c => P.pc.addIceCandidate(c).catch(() => { }));
+      else if (P) d.cs.forEach(c => P.pend.push(c));
+      else (C.early[from] = C.early[from] || []).push(...d.cs);
+    }
+  }
+  function onParts(parts) {
+    const names = parts.map(p => p.name), mine = parts.find(p => p.name === C.me);
+    if (mine) C.myJ = mine.j;
+    parts.forEach(p => {
+      if (p.name === C.me || C.peers[p.name]) return;
+      const iOffer = mine && (mine.j > p.j || (mine.j === p.j && C.me > p.name));
+      if (iOffer) callOut(p.name);
+    });
+    Object.keys(C.peers).forEach(n => { if (!names.includes(n) && Date.now() - C.peers[n].made > 8000) closePeer(n) });
+  }
+  async function tick() {
+    if (!C.active || C.busy) return; C.busy = true;
+    try {
+      const hb = Date.now() - C.hb > 10000;
+      const r = await api("/api/echo/call/poll?room=" + encodeURIComponent(C.room) + "&after=" + C.after + (hb ? "&hb=1" : ""));
+      if (hb) C.hb = Date.now(); C.fail = 0;
+      onParts(r.parts || []);
+      for (const s of (r.sigs || [])) { C.after = Math.max(C.after, s.id); await onSig(s) }
+    } catch (e) { if (++C.fail > 25) { leave(false); EchoCall.onEnd && EchoCall.onEnd("Нет связи с сервером, звонок завершён.") } }
+    finally { C.busy = false }
+  }
+
+  /* ---------- управление ---------- */
+  function toggleMic() { C.micOn = !C.micOn; sfx(C.micOn ? "unmute" : "mute"); if (C.mic) C.mic.enabled = C.micOn; paintSelf(); sendAll() }
+  async function camStart() {
+    if (C.devId === undefined) { try { C.devId = localStorage.getItem("callCamId") || "" } catch (e) { C.devId = "" } }
+    const base = { width: { ideal: 960 }, height: { ideal: 540 }, frameRate: { ideal: 60 } };
+    let s;
+    if (C.devId) { try { s = await navigator.mediaDevices.getUserMedia({ video: { ...base, deviceId: { exact: C.devId } }, audio: false }) } catch (e) { C.devId = "" } }
+    if (!s) s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: C.facing, ...base }, audio: false });
+    await camList();
+    C.cam = s.getVideoTracks()[0]; try { C.cam.contentHint = "motion" } catch (e) { } C.tile._v.srcObject = new MediaStream([C.cam]); try { C.tile._v.play().catch(() => { }) } catch (e) { }
+    Object.values(C.peers).forEach(attachLocal);
+  }
+  function camStop() { if (C.cam) { try { C.cam.stop() } catch (e) { } C.cam = null } if (C.tile) C.tile._v.srcObject = null; Object.values(C.peers).forEach(attachLocal) }
+  async function scrStart() {
+    const s = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30 } }, audio: false });
+    const tr = s.getVideoTracks()[0]; if (!tr) throw new Error("no video");
+    if (C.cam) { try { C.cam.stop() } catch (e) { } }
+    C.cam = tr; C.scr = true; C.camOn = true; try { tr.contentHint = "detail" } catch (e) { }
+    tr.onended = () => { if (C.scr && C.cam === tr) { const bg = document.hidden || Date.now() - (C.hid || 0) < 5000; scrStop(); if (bg) hint("Показ экрана остановился: приложение свернулось. Вернись и нажми «Экран» снова.", true) } };
+    C.tile._v.srcObject = new MediaStream([tr]); try { C.tile._v.play().catch(() => { }) } catch (e) { }
+    Object.values(C.peers).forEach(attachLocal);
+  }
+  function scrStop() { C.scr = false; C.camOn = false; camStop(); sfx("cam"); paintSelf(); sendAll() }
+  async function toggleScr() {
+    if (C.scr) return scrStop();
+    try { await scrStart(); sfx("cam"); hint(""); paintSelf(); sendAll() }
+    catch (e) { C.scr = false; if (C.cam && !C.camOn) C.cam = null; if (e && e.name !== "NotAllowedError" && e.name !== "AbortError") hint("Показ экрана здесь недоступен.", true); paintSelf() }
+  }
+  async function toggleCam() {
+    if (C.scr) return scrStop();
+    if (!navigator.mediaDevices) return hint("Камера здесь недоступна.", true);
+    try { if (C.camOn) { C.camOn = false; camStop() } else { await camStart(); C.camOn = true } sfx("cam"); hint(""); paintSelf(); sendAll() }
+    catch (e) { C.camOn = false; hint("Нет доступа к камере. Разреши её в настройках.", true); paintSelf() }
+  }
+  async function flip() {
+    if (!C.camOn) return; C.facing = C.facing === "user" ? "environment" : "user";
+    try { if (C.cam) { C.cam.stop(); C.cam = null } await camStart(); paintSelf() } catch (e) { C.facing = C.facing === "user" ? "environment" : "user"; try { await camStart() } catch (x) { C.camOn = false; paintSelf() } }
+  }
+
+  /* ---------- вход и выход ---------- */
+  async function join(room, roomName) {
+    build();
+    if (C.active && C.room === room) { show(); return true }
+    if (C.active) await leave(false);
+    if (!window.RTCPeerConnection || !navigator.mediaDevices) { EchoCall.onEnd && EchoCall.onEnd("Здесь звонки не работают. Открой ЭХО в Chrome или Safari."); return false }
+    let r; try { r = await post("/api/echo/call/join", { room }) } catch (e) { EchoCall.onEnd && EchoCall.onEnd(e.message); return false }
+    Object.assign(C, { active: true, room, roomName: roomName || "", me: r.me, ice: r.ice || [], turn: !!r.turn, peers: {}, early: {}, after: 0, hb: Date.now(), fail: 0, micOn: true, camOn: false, mic: null, cam: null, facing: "user", scr: false });
+    const G = g("clG"); G.textContent = ""; C.tile = makeTile(C.me, true); G.appendChild(C.tile); layout();
+    try { const s = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false }); C.mic = s.getAudioTracks()[0] }
+    catch (e) { C.micOn = false; hint("Микрофон не включился. Ты слышишь других, но они тебя нет. Разреши микрофон в настройках.", true) }
+    C.t0 = Date.now(); if (C.mic) watch(C.tile, new MediaStream([C.mic])); sfx("me-join");
+    paintSelf(); onParts(r.parts || []); show(); clearTimeout(C.sp); speakLoop(); clearInterval(C.tt); C.tt = setInterval(timerLoop, 1000); timerLoop();
+    clearInterval(C.timer); C.timer = setInterval(tick, 1500);
+    EchoCall.onChange && EchoCall.onChange();
+    return true;
+  }
+  function show() { build(); g("call").classList.add("open"); paintSelf(); layout() }
+  function minimize() { const c = g("call"); if (c) c.classList.remove("open"); EchoCall.onChange && EchoCall.onChange() }
+  async function leave(hide) {
+    const room = C.room, was = C.active; if (was) sfx("me-leave"); C.active = false; clearInterval(C.timer); C.timer = 0; clearTimeout(C.sp); clearInterval(C.tt);
+    Object.keys(C.peers).forEach(closePeer);
+    [C.mic, C.cam].forEach(t => { try { t && t.stop() } catch (e) { } }); C.mic = C.cam = null; C.camOn = false; C.scr = false;
+    const G = g("clG"); if (G) G.textContent = ""; C.tile = null;
+    if (hide) minimize();
+    if (was) { try { await post("/api/echo/call/leave", { room }) } catch (e) { } }
+    EchoCall.onChange && EchoCall.onChange();
+  }
+  async function who(room) { try { const r = await api("/api/echo/call/who?room=" + encodeURIComponent(room)); return r.parts || [] } catch (e) { return [] } }
+
+  const EchoCall = { init(o) { api = o.api; build() }, join, leave, show, who, sfx, active: () => C.active, room: () => C.room, roomName: () => C.roomName };
+  window.EchoCall = EchoCall;
+})();
