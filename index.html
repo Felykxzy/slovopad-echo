@@ -132,7 +132,7 @@ nav button.on{color:#fff}
 .ctile{position:relative;border-radius:26px;overflow:hidden;background:linear-gradient(160deg,rgba(255,255,255,.1),rgba(255,255,255,.03));border:1px solid var(--glass-line);box-shadow:var(--glass-hi);min-height:0}
 .ctile.wait{border-color:rgba(255,200,80,.6)}
 .ctile video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
-.ctile.self.flip video{transform:scaleX(-1)}.ctile.nocam video{opacity:0}.ctile.scr video{object-fit:contain;background:#05060f}
+.ctile.self.flip video{transform:scaleX(-1)}.ctile{isolation:isolate}.ctile video{transform:translateZ(0)}.ctile.self.flip video{transform:scaleX(-1) translateZ(0)}.ctile.nocam .cav{z-index:1;background:linear-gradient(145deg,#1b1f55,#2a1250)}.ctile.scr video{object-fit:contain;background:#05060f}
 .ctile .cav{position:absolute;inset:0;display:none;align-items:center;justify-content:center}.ctile.nocam .cav{display:flex}
 .ctile .cav i{width:84px;height:84px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:36px;font-weight:700;color:#fff}
 .ctile.self .cav i{width:56px;height:56px;font-size:24px}
