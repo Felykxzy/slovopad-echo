@@ -117,6 +117,36 @@ nav button.on{color:#fff}
 .composer button svg{width:20px;height:20px;stroke:#0b0a26;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 .toast{position:fixed;left:50%;bottom:calc(var(--sab) + 104px);transform:translateX(-50%) translateY(20px);opacity:0;padding:12px 18px;border-radius:20px;font-size:14px;transition:.35s var(--ease);pointer-events:none;z-index:60;max-width:90vw;background:var(--glass);border:1px solid var(--glass-line);backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);box-shadow:var(--glass-hi),var(--shadow)}
 .toast.on{opacity:1;transform:translateX(-50%)}
+
+/* ---- возможности чата: ответы, картинки, реакции, стикеры, меню сообщения ---- */
+.msg{cursor:pointer}.msg.dl{opacity:.6}.msg.flash{outline:2px solid var(--pk);outline-offset:2px}
+.msg.stk{background:none!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;padding:0 4px}
+.msg .mt{white-space:pre-wrap}.msg .mt.big{font-size:44px;line-height:1.15;display:block}
+.mdel{opacity:.55;font-style:italic}
+.mq{margin:0 0 6px;padding:4px 10px;border-left:3px solid var(--pk);background:rgba(255,255,255,.07);border-radius:8px;font-size:12px;display:flex;flex-direction:column;gap:1px;cursor:pointer;max-width:100%;min-width:120px}
+.mq b{font-size:11px;color:var(--pk);letter-spacing:.06em}.mq span{opacity:.75;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.msg.me .mq{background:rgba(0,0,0,.2);border-left-color:#fff}.msg.me .mq b{color:#fff}
+.mimg{margin:0 0 4px;border-radius:14px;overflow:hidden;min-width:90px}
+.mimg img{display:block;max-width:min(240px,64vw);max-height:min(280px,40vh);border-radius:14px;cursor:zoom-in}
+.mimgp{padding:22px 30px;text-align:center;font-size:24px;opacity:.5;background:rgba(255,255,255,.06);border-radius:14px}
+.men{color:var(--ac);font-weight:700}.men.me{background:rgba(255,111,181,.3);color:#fff;border-radius:6px;padding:0 4px}
+.rxs{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}.rxs:empty{display:none}.msg.me .rxs{justify-content:flex-end}
+.rxc{border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:var(--tx);border-radius:99px;padding:2px 9px;font-size:13px;cursor:pointer}
+.rxc.me{border-color:var(--ac);background:rgba(122,240,255,.2)}
+.chty{align-self:flex-start;font-size:12px;color:var(--mut);padding:2px 10px}
+.eksh{position:absolute;inset:0;z-index:30;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.45)}
+.eskc{width:100%;max-width:520px;display:flex;flex-direction:column;gap:6px;padding:12px;border-radius:26px 26px 0 0;background:rgba(18,16,48,.96);border-top:1px solid var(--glass-line);max-height:92%;overflow-y:auto;padding-bottom:calc(12px + var(--sab))}
+.esre{display:flex;justify-content:center;gap:4px}.esre button{border:0;background:rgba(255,255,255,.08);font-size:26px;border-radius:99px;padding:6px 10px;cursor:pointer}
+.esa{border:0;background:rgba(255,255,255,.07);color:var(--tx);font:inherit;font-size:15px;padding:12px;border-radius:14px;text-align:left;cursor:pointer}.esa.bad{color:#ff7a8a}
+.ekview{position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center}.ekview img{max-width:96vw;max-height:92vh;border-radius:8px}
+.chbar{display:flex;align-items:center;gap:8px;margin:0 12px 6px;padding:7px 12px;border-radius:18px;font-size:13px;background:var(--glass);border:1px solid var(--glass-line)}
+.chbar[hidden]{display:none}.chbar span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--mut)}
+.chbar button{flex:none;width:30px;height:30px;border-radius:50%;border:1px solid rgba(255,120,120,.5);background:rgba(255,100,100,.15);color:#ff9a9a;cursor:pointer}
+.chpin{margin:8px 12px 0;cursor:pointer}.chpin span{color:var(--tx)}
+.chab{margin:6px 14px 0;font-size:12px;color:var(--mut);line-height:1.4}.chab[hidden]{display:none}
+.stkp{margin:0 12px 6px;padding:6px;border-radius:22px;display:flex;flex-wrap:wrap;justify-content:center;max-height:150px;overflow-y:auto;background:var(--glass);border:1px solid var(--glass-line)}
+.stkp[hidden]{display:none}.stk{background:none;border:0;font-size:30px;line-height:1;padding:6px 8px;border-radius:14px;cursor:pointer}.stk:active{transform:scale(1.25);background:rgba(255,255,255,.1)}
+.composer .cx{width:40px;height:40px;background:none;box-shadow:none;font-size:21px;line-height:1}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
 /* ---- звонки ---- */
@@ -216,8 +246,12 @@ nav button.on{color:#fff}
     <button class="ibtn chbtn" id="chCall" type="button" aria-label="Позвонить"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A15 15 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg></button>
   </header>
   <div id="chBanner" class="glass" hidden></div>
+  <div id="chPin" class="chbar chpin glass" hidden></div>
+  <div id="chAb" class="chab" hidden></div>
   <div id="msgs"></div>
-  <div class="composer glass"><input id="chIn" placeholder="Сообщение" maxlength="500" enterkeyhint="send"><button id="chSend" type="button" aria-label="Отправить"><svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button></div>
+  <div id="chSk" class="stkp" hidden></div>
+  <div id="chQp" class="chbar" hidden></div>
+  <div class="composer glass"><button id="chPh" class="cx" type="button" aria-label="Фото">📷</button><button id="chRx" class="cx" type="button" aria-label="Стикеры">😊</button><input id="chIn" placeholder="Сообщение" maxlength="500" enterkeyhint="send"><button id="chSend" type="button" aria-label="Отправить"><svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button></div>
 </section>
 
 <div class="toast glass" id="toast"></div>
@@ -225,6 +259,7 @@ nav button.on{color:#fff}
 
 <script src="qr.js"></script>
 <script src="call.js"></script>
+<script src="echokit.js"></script>
 <script>
 (() => {
   "use strict";
@@ -378,65 +413,138 @@ nav button.on{color:#fff}
     }
   }
 
+  /* ---------- общие части чата: сообщения, ответы, правка, реакции, картинки ---------- */
+  let since = 0, reply = null, edit = null, editWas = false, typedAt = 0;
+  const kit = EchoKit.create({
+    me: () => (me && me.username) || "",
+    get ticks() { return !room },
+    img: id => (room ? api("/api/echo/room/img?room=" + encodeURIComponent(room.id) + "&id=" + id) : api("/api/chat/img?with=" + encodeURIComponent(chat.spCode) + "&id=" + id)).then(r => r.img),
+    react: (id, emo) => doReact(id, emo)
+  });
+  const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e };
+  const ctxBody = extra => room ? { room: room.id, ...extra } : { to: chat.spCode, ...extra };
+  const ctxPath = p => room ? "/api/echo/room/" + p : "/api/chat/" + p;
+  const refresh = () => { busy = false; return room ? pollRoom(false) : pollChat(false) };
+  function msgPaint(box, m) {
+    box.textContent = ""; box.className = "msg" + (m.mine ? " me" : "") + (m.dl ? " dl" : "");
+    if (room && !m.mine && m.who) box.appendChild(mk("span", "who", m.who));
+    const q = kit.quote(m, kit.jump); if (q) box.appendChild(q);
+    const im = kit.media(m); if (im) box.appendChild(im);
+    if (m.body || m.dl) { const t = kit.text(m); box.appendChild(t); if (t.classList.contains("big")) box.classList.add("stk") }
+    box.appendChild(mk("span", "t", kit.meta(m)));
+    const rx = mk("div", "rxs"); box.appendChild(rx); kit.reg(m.id, box, rx);
+    box.onclick = m.dl ? null : () => msgSheet(m);
+  }
+  function msgAdd(m) { kit.msgs[m.id] = m; const box = mk("div"); box.dataset.id = m.id; msgPaint(box, m); $("msgs").appendChild(box) }
+  function msgChanged(m) { const old = kit.els[m.id]; kit.msgs[m.id] = { ...(kit.msgs[m.id] || {}), ...m }; if (old) msgPaint(old, kit.msgs[m.id]) }
+  function ticksPaint() { Object.keys(kit.els).forEach(id => { const m = kit.msgs[id]; if (m && m.mine) { const t = kit.els[id].querySelector(".t"); if (t) t.textContent = kit.meta(m) } }) }
+  function typingPaint(names) {
+    const box = $("msgs"); let ty = box.querySelector(".chty");
+    if (!names) { if (ty) ty.remove(); return }
+    if (!ty) ty = mk("div", "chty"); ty.textContent = names + " печатает…"; box.appendChild(ty);
+  }
+  function msgSheet(m) {
+    const acts = [["↩ Ответить", () => { reply = m; edit = null; barPaint(); try { $("chIn").focus() } catch (e) { } }]];
+    if (m.body) acts.push(["Скопировать", () => { try { navigator.clipboard.writeText(m.body) } catch (e) { } }]);
+    if (m.mine && m.body) acts.push(["✎ Изменить", () => { edit = m; reply = null; barPaint(); const i = $("chIn"); i.value = m.body; try { i.focus() } catch (e) { } }]);
+    if (room && room.canMod) acts.push([room.pin && room.pin.id === m.id ? "📌 Открепить" : "📌 Закрепить", () => api("/api/echo/room/pin", { room: room.id, id: room.pin && room.pin.id === m.id ? 0 : m.id }).then(refresh).catch(e => toast(e.message))]);
+    const ow = room && (room.members || []).find(x => x.owner);
+    if (m.mine || (room && room.canMod && !(ow && ow.name === m.who))) acts.push(["🗑 Удалить", () => api(ctxPath("del"), ctxBody({ id: m.id })).then(refresh).catch(e => toast(e.message)), true]);
+    kit.sheet($("chat"), m, acts);
+  }
+  async function doReact(id, emo) { try { await api(ctxPath("react"), ctxBody({ id, emo })); await refresh() } catch (e) { toast(e.message) } }
+  function barPaint() {
+    const r = $("chQp"), q = edit || reply; r.textContent = ""; r.hidden = !q;
+    if (!q) { if (editWas) $("chIn").value = ""; editWas = false; return }
+    editWas = !!edit;
+    r.appendChild(mk("span", "", (edit ? "✎ Изменить: " : "↩ " + (q.mine ? "Себе" : (q.who || (chat && chat.username) || "")) + ": ") + String(q.body || "📷").slice(0, 50)));
+    const x = mk("button", "", "✕"); x.type = "button"; x.onclick = () => { edit = reply = null; barPaint() }; r.appendChild(x);
+  }
+  function chatReset() {
+    kit.reset(); since = 0; reply = edit = null; editWas = false; typedAt = 0; last = 0; busy = false;
+    barPaint(); $("chSk").hidden = true; $("chIn").value = ""; $("chPin").hidden = true; $("chAb").hidden = true;
+  }
+  // text: из поля; sticker — смайлик строкой; img — готовая картинка
+  async function sendMsg(sticker, img) {
+    if (!room && !chat) return;
+    const inp = $("chIn"), text = typeof sticker === "string" ? sticker : inp.value.trim();
+    if (!text && !img) return;
+    const was = inp.value; if (typeof sticker !== "string") inp.value = "";
+    try {
+      if (edit) { await api(ctxPath("edit"), ctxBody({ id: edit.id, text })); edit = null; editWas = false; barPaint() }
+      else { await api(ctxPath("send"), ctxBody({ text, img: img || undefined, reply: reply ? reply.id : undefined })); reply = null; barPaint() }
+      await refresh(); const l = $("msgs"); l.scrollTop = l.scrollHeight;
+    } catch (e) { if (typeof sticker !== "string") inp.value = was; toast(e.message) }
+  }
+
   /* ---------- личный чат ---------- */
   function openChat(p) {
     if (!p) return;
-    closeChat(false); chat = p; room = null; last = 0; $("chat").classList.add("canc"); $("chInv").hidden = true; banner(null);
+    closeChat(false); chat = p; room = null; chatReset(); $("chat").classList.add("canc"); $("chInv").hidden = true; banner(null);
     $("chName").textContent = p.username; $("chSub").textContent = p.online ? "в сети" : "не в сети";
     $("chAv").className = "av " + (p.online ? "on" : ""); $("chAv").textContent = (p.avatar || p.username[0]).toString();
     $("msgs").innerHTML = ""; $("chat").classList.add("open");
-    pollChat(); timer = setInterval(pollChat, 3000);
+    pollChat(true); timer = setInterval(() => pollChat(false), 3000);
   }
-  async function pollChat() {
-    if (!chat) return;
-    const who = chat;
+  async function pollChat(first) {
+    if (!chat || busy || document.hidden) return;
+    const who = chat; busy = true;
     try {
-      const r = await api("/api/chat?with=" + encodeURIComponent(who.spCode) + "&after=" + last);
+      const r = await api("/api/chat?with=" + encodeURIComponent(who.spCode) + "&after=" + last + "&since=" + (first ? 0 : since));
       if (chat !== who) return;
-      const box = $("msgs"), stick = box.scrollHeight - box.scrollTop - box.clientHeight < 80 || !last;
-      (r.messages || []).forEach(m => { if (m.id <= last) return; last = m.id; box.insertAdjacentHTML("beforeend", `<div class="msg ${m.mine ? "me" : ""}">${esc(m.body)}<span class="t">${clock(m.t)}</span></div>`) });
+      since = r.now || 0;
+      const box = $("msgs"), stick = first || box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+      (r.messages || []).forEach(m => { if (m.id <= last) return; last = m.id; msgAdd(m) });
+      (r.changed || []).forEach(msgChanged);
+      kit.readTo = r.readTo || 0; ticksPaint();
+      if (r.react) kit.setReact(r.react);
+      typingPaint(r.typing ? who.username : "");
       if (stick) box.scrollTop = box.scrollHeight;
-    } catch (e) {}
-  }
-  async function sendChat() {
-    const t = $("chIn").value.trim(); if (!t) return;
-    if (room) {
-      const cur = room; $("chIn").value = "";
-      try { await api("/api/echo/room/send", { room: cur.id, text: t }); pollRoom() } catch (e) { toast(e.message) }
-      return;
-    }
-    if (!chat) return;
-    const who = chat; $("chIn").value = "";
-    try { await api("/api/chat/send", { to: who.spCode, text: t }); pollChat() } catch (e) { toast(e.message) }
+    } catch (e) {} finally { busy = false }
   }
   function closeChat(hide = true) {
     clearInterval(timer); timer = null;
     if (hide) $("chat").classList.remove("open");
     $("chat").classList.remove("canc"); banner(null);
+    const sh = $("chat").querySelector(".eksh"); if (sh) sh.remove();
     chat = null; if (hide) room = null;
   }
   $("chBack").onclick = () => { closeChat(); render() };
-  $("chSend").onclick = sendChat;
-  $("chIn").addEventListener("keydown", e => { if (e.key === "Enter") sendChat() });
+  $("chSend").onclick = () => sendMsg();
+  $("chIn").addEventListener("keydown", e => { if (e.key === "Enter") sendMsg() });
+  $("chRx").onclick = () => { const r = $("chSk"); if (r.hidden) kit.stickers(r, x => sendMsg(x)); r.hidden = !r.hidden };
+  $("chPh").onclick = () => kit.pick((e, img) => { if (e) { toast(e.message); return } sendMsg(null, img) });
+  $("chIn").addEventListener("input", () => {
+    const n = Date.now(); if ((!room && !chat) || !$("chIn").value || n - typedAt < 3000) return; typedAt = n;
+    api(ctxPath("typing"), ctxBody({})).catch(() => { });
+  });
 
   /* ---------- комната ---------- */
   function openRoom(id, name) {
-    closeChat(false); room = { id, name }; last = 0; $("chat").classList.add("canc"); $("chInv").hidden = false; banner(null); pollBanner();
+    closeChat(false); room = { id, name }; chat = null; chatReset(); $("chat").classList.add("canc"); $("chInv").hidden = false; banner(null); pollBanner();
     $("chName").textContent = "# " + name; $("chSub").textContent = "комната";
     $("chAv").className = "av rm"; $("chAv").textContent = (name || "#")[0];
     $("msgs").innerHTML = ""; $("chat").classList.add("open");
-    pollRoom(); timer = setInterval(pollRoom, 3000);
+    pollRoom(true); timer = setInterval(() => pollRoom(false), 3000);
   }
-  async function pollRoom() {
-    if (!room) return;
-    const cur = room;
+  async function pollRoom(first) {
+    if (!room || busy || document.hidden) return;
+    const cur = room; busy = true;
     try {
-      const r = await api("/api/echo/room/msgs?room=" + encodeURIComponent(cur.id) + "&after=" + last);
+      const r = await api("/api/echo/room/msgs?room=" + encodeURIComponent(cur.id) + "&after=" + last + "&since=" + (first ? 0 : since));
       if (room !== cur) return;
-      const box = $("msgs"), stick = box.scrollHeight - box.scrollTop - box.clientHeight < 80 || !last;
-      (r.messages || []).forEach(m => { if (m.id <= last) return; last = m.id; box.insertAdjacentHTML("beforeend", `<div class="msg ${m.mine ? "me" : ""}">${m.mine ? "" : `<span class="who">${esc(m.who)}</span>`}${esc(m.body)}<span class="t">${clock(m.t)}</span></div>`) });
+      since = r.now || 0;
+      if (r.room) { cur.canMod = !!r.room.mod; cur.pin = r.room.pin; cur.about = r.room.about }
+      cur.members = r.members || [];
+      const box = $("msgs"), stick = first || box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+      (r.messages || []).forEach(m => { if (m.id <= last) return; last = m.id; msgAdd(m) });
+      (r.changed || []).forEach(msgChanged);
+      if (r.react) kit.setReact(r.react);
+      { const pn = $("chPin"), ab = $("chAb"); pn.hidden = !cur.pin; if (cur.pin) { pn.textContent = ""; pn.appendChild(mk("span", "", "📌 " + cur.pin.who + ": " + cur.pin.text)); pn.onclick = () => kit.jump(cur.pin.id) }
+        ab.hidden = !cur.about; ab.textContent = cur.about || "" }
+      typingPaint(r.typing && r.typing.length ? r.typing.join(", ") : "");
       if (stick) box.scrollTop = box.scrollHeight;
-    } catch (e) {}
+    } catch (e) {} finally { busy = false }
   }
   function stopPoll() { clearInterval(timer); timer = null }
   const clock = t => { const d = new Date(t); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0") };
