@@ -104,8 +104,8 @@ nav button.on{color:#fff}
 #chat{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg);z-index:20;padding-top:var(--sat);transform:translateX(100%);transition:transform .4s var(--ease)}
 #chat.open{transform:none}
 #chat header{margin:8px 10px 0;padding:10px 12px;border-radius:30px;background:var(--glass);border:1px solid var(--glass-line);box-shadow:var(--glass-hi),0 10px 30px rgba(0,0,0,.25);backdrop-filter:blur(26px) saturate(190%);-webkit-backdrop-filter:blur(26px) saturate(190%)}
-#msgs{flex:1;overflow-y:auto;padding:16px 14px 10px;display:flex;flex-direction:column;gap:10px}
-.msg{max-width:80%;padding:11px 15px 9px;border-radius:24px 24px 24px 8px;background:var(--glass);border:1px solid var(--glass-line);align-self:flex-start;word-break:break-word;font-size:16px;line-height:1.38;box-shadow:var(--glass-hi),0 8px 20px rgba(0,0,0,.18);backdrop-filter:blur(20px) saturate(170%);-webkit-backdrop-filter:blur(20px) saturate(170%);animation:up .35s var(--ease) both}
+#msgs{flex:1;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:16px 14px 10px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:80%;padding:11px 15px 9px;border-radius:24px 24px 24px 8px;background:rgba(40,36,92,.72);border:1px solid var(--glass-line);align-self:flex-start;word-break:break-word;font-size:16px;line-height:1.38;box-shadow:var(--glass-hi);-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;touch-action:manipulation}.msg.nw{animation:up .28s var(--ease) both}
 .msg.me{align-self:flex-end;border-radius:24px 24px 8px 24px;background:linear-gradient(135deg,rgba(122,240,255,.45),rgba(181,140,255,.5) 60%,rgba(255,111,181,.45));border-color:rgba(255,255,255,.4)}
 .msg .who{display:block;font-size:12px;color:var(--ac);font-weight:700;margin-bottom:3px}
 .msg .t{display:block;font-size:11px;color:var(--mut);margin-top:4px;text-align:right}
@@ -127,7 +127,7 @@ nav button.on{color:#fff}
 .mq b{font-size:11px;color:var(--pk);letter-spacing:.06em}.mq span{opacity:.75;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .msg.me .mq{background:rgba(0,0,0,.2);border-left-color:#fff}.msg.me .mq b{color:#fff}
 .mimg{margin:0 0 4px;border-radius:14px;overflow:hidden;min-width:90px}
-.mimg img{display:block;max-width:min(240px,64vw);max-height:min(280px,40vh);border-radius:14px;cursor:zoom-in}
+.mimg img{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;display:block;max-width:min(240px,64vw);max-height:min(280px,40vh);border-radius:14px;cursor:zoom-in}
 .mimgp{padding:22px 30px;text-align:center;font-size:24px;opacity:.5;background:rgba(255,255,255,.06);border-radius:14px}
 .men{color:var(--ac);font-weight:700}.men.me{background:rgba(255,111,181,.3);color:#fff;border-radius:6px;padding:0 4px}
 .rxs{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}.rxs:empty{display:none}.msg.me .rxs{justify-content:flex-end}
@@ -414,13 +414,15 @@ nav button.on{color:#fff}
   }
 
   /* ---------- общие части чата: сообщения, ответы, правка, реакции, картинки ---------- */
-  let since = 0, reply = null, edit = null, editWas = false, typedAt = 0;
+  let lpAt = 0, atB = true, since = 0, reply = null, edit = null, editWas = false, typedAt = 0;
   const kit = EchoKit.create({
     me: () => (me && me.username) || "",
     get ticks() { return !room },
     img: id => (room ? api("/api/echo/room/img?room=" + encodeURIComponent(room.id) + "&id=" + id) : api("/api/chat/img?with=" + encodeURIComponent(chat.spCode) + "&id=" + id)).then(r => r.img),
-    react: (id, emo) => doReact(id, emo)
+    react: (id, emo) => doReact(id, emo),
+    onsize: () => { if (atB) { const l = $("msgs"); l.scrollTop = l.scrollHeight } }
   });
+  $("msgs").addEventListener("scroll", () => { const l = $("msgs"); atB = l.scrollHeight - l.scrollTop - l.clientHeight < 80 }, { passive: true });
   const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e };
   const ctxBody = extra => room ? { room: room.id, ...extra } : { to: chat.spCode, ...extra };
   const ctxPath = p => room ? "/api/echo/room/" + p : "/api/chat/" + p;
@@ -433,9 +435,19 @@ nav button.on{color:#fff}
     if (m.body || m.dl) { const t = kit.text(m); box.appendChild(t); if (t.classList.contains("big")) box.classList.add("stk") }
     box.appendChild(mk("span", "t", kit.meta(m)));
     const rx = mk("div", "rxs"); box.appendChild(rx); kit.reg(m.id, box, rx);
-    box.onclick = m.dl ? null : () => msgSheet(m);
+    box.onclick = null; box.oncontextmenu = null; box.onpointerdown = null;
+    if (!m.dl) {
+      let tm = 0, sx = 0, sy = 0;
+      const stop = () => { clearTimeout(tm); tm = 0 };
+      box.onpointerdown = e => { sx = e.clientX; sy = e.clientY; stop(); tm = setTimeout(() => { tm = 0; lpAt = Date.now(); try { navigator.vibrate && navigator.vibrate(12) } catch (x) { } msgSheet(m) }, 420) };
+      box.onpointermove = e => { if (tm && (Math.abs(e.clientX - sx) > 8 || Math.abs(e.clientY - sy) > 8)) stop() };
+      box.onpointerup = box.onpointercancel = box.onpointerleave = stop;
+      box.oncontextmenu = e => { e.preventDefault(); if (Date.now() - lpAt > 600) { lpAt = Date.now(); msgSheet(m) } };
+      box.addEventListener("click", ev => { if (Date.now() - lpAt < 600) { ev.stopPropagation(); ev.preventDefault() } }, true);
+      box.onclick = () => msgSheet(m);
+    }
   }
-  function msgAdd(m) { kit.msgs[m.id] = m; const box = mk("div"); box.dataset.id = m.id; msgPaint(box, m); $("msgs").appendChild(box) }
+  function msgAdd(m, fresh) { kit.msgs[m.id] = m; const box = mk("div"); box.dataset.id = m.id; msgPaint(box, m); if (fresh) box.classList.add("nw"); $("msgs").appendChild(box) }
   function msgChanged(m) { const old = kit.els[m.id]; kit.msgs[m.id] = { ...(kit.msgs[m.id] || {}), ...m }; if (old) msgPaint(old, kit.msgs[m.id]) }
   function ticksPaint() { Object.keys(kit.els).forEach(id => { const m = kit.msgs[id]; if (m && m.mine) { const t = kit.els[id].querySelector(".t"); if (t) t.textContent = kit.meta(m) } }) }
   function typingPaint(names) {
@@ -494,7 +506,7 @@ nav button.on{color:#fff}
       if (chat !== who) return;
       since = r.now || 0;
       const box = $("msgs"), stick = first || box.scrollHeight - box.scrollTop - box.clientHeight < 80;
-      (r.messages || []).forEach(m => { if (m.id <= last) return; last = m.id; msgAdd(m) });
+      (r.messages || []).forEach(m => { if (m.id <= last) return; last = m.id; msgAdd(m, !first) });
       (r.changed || []).forEach(msgChanged);
       kit.readTo = r.readTo || 0; ticksPaint();
       if (r.react) kit.setReact(r.react);
@@ -537,7 +549,7 @@ nav button.on{color:#fff}
       if (r.room) { cur.canMod = !!r.room.mod; cur.pin = r.room.pin; cur.about = r.room.about }
       cur.members = r.members || [];
       const box = $("msgs"), stick = first || box.scrollHeight - box.scrollTop - box.clientHeight < 80;
-      (r.messages || []).forEach(m => { if (m.id <= last) return; last = m.id; msgAdd(m) });
+      (r.messages || []).forEach(m => { if (m.id <= last) return; last = m.id; msgAdd(m, !first) });
       (r.changed || []).forEach(msgChanged);
       if (r.react) kit.setReact(r.react);
       { const pn = $("chPin"), ab = $("chAb"); pn.hidden = !cur.pin; if (cur.pin) { pn.textContent = ""; pn.appendChild(mk("span", "", "📌 " + cur.pin.who + ": " + cur.pin.text)); pn.onclick = () => kit.jump(cur.pin.id) }

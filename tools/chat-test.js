@@ -60,6 +60,13 @@ const ok = (c, m) => { console.log((c ? '  ok   ' : '  FAIL ') + m); if (!c) fai
   ok(await q('#msgs .mt.big'), 'смайлик крупно (стикер)'); ok(await q('#msgs .rxc'), 'реакция видна');
   ok(/печатает/.test(t1), 'видно «печатает…»');
   ok(/✓✓/.test(t1), 'отметка «прочитано»');
+  { const bb = await p.locator('#msgs .mimg img').first().boundingBox(); const cx = bb.x + bb.width / 2, cy = bb.y + bb.height / 2;
+    await p.mouse.move(cx, cy); await p.mouse.down(); await p.waitForTimeout(650); await p.mouse.up(); await p.waitForTimeout(250);
+    ok(await q('.eksh .esre'), 'долгое нажатие по фото открывает меню');
+    ok(!(await q('.ekview')), 'при этом фото во весь экран не открылось');
+    await p.click('.eksh', { position: { x: 20, y: 20 } }); await p.waitForTimeout(200);
+    await p.mouse.click(cx, cy); await p.waitForTimeout(250);
+    ok(await q('.ekview'), 'обычное нажатие по фото открывает его на весь экран'); await p.click('.ekview'); await p.waitForTimeout(150); }
   await p.screenshot({ path: shots + '/echo-dm.png' });
   // меню сообщения, ответ, правка, удаление, стикер, реакция
   await p.click('#msgs .msg.me >> nth=0'); await p.waitForTimeout(300);

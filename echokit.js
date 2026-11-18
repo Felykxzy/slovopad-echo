@@ -49,7 +49,7 @@
     K.media = m => {
       if (!m.im) return null;
       const box = h("div", "mimg"), ph = h("div", "mimgp", "📷"); box.appendChild(ph);
-      const show = src => { if (!src) { ph.textContent = T("Картинка устарела", "Image expired", "Картинка застаріла"); return } const i = h("img"); i.src = src; i.alt = ""; i.onclick = e => { e.stopPropagation(); viewer(src) }; box.textContent = ""; box.appendChild(i) };
+      const show = src => { if (!src) { ph.textContent = T("Картинка устарела", "Image expired", "Картинка застаріла"); return } const i = h("img"); i.src = src; i.alt = ""; i.onclick = e => { e.stopPropagation(); viewer(src) }; box.textContent = ""; i.draggable = false; i.onload = () => { if (cfg.onsize) cfg.onsize() }; box.appendChild(i) };
       if (K.imgs[m.id]) show(K.imgs[m.id]);
       else Promise.resolve(cfg.img(m.id)).then(s => { K.imgs[m.id] = s || ""; show(s) }).catch(() => { ph.textContent = "⚠" });
       return box;
